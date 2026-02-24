@@ -289,6 +289,153 @@ ws_result.range('A1').options(pd.DataFrame).value = df
 
 ---
 
+### 📗 06. 실전 자동화 프로젝트 — 차트 생성 & 스케줄링
+
+> 📄 [06.실전자동화_차트_스케줄링.ipynb](./06.실전자동화_차트_스케줄링.ipynb)
+
+**차트(Chart) 생성**
+
+```python
+# 차트 코드 3단계
+# 1) 차트 객체 생성
+chart = ws.charts.add(left=10, top=130, width=500, height=280)
+# 2) 데이터 범위 연결
+chart.set_source_data(ws.range('A1:C7'))
+# 3) 종류 설정 ('line' / 'bar_clustered' / 'pie')
+chart.chart_type = 'line'
+```
+
+**API 세부 설정**
+
+```python
+c = chart.api[1]      # COM 객체 접근
+c.HasTitle = True
+c.ChartTitle.Text = '월별 매출 현황'
+c.Axes(2).HasTitle = True
+c.Axes(2).AxisTitle.Text = '금액(만원)'
+c.SeriesCollection(1).HasDataLabels = True
+```
+
+**스케줄링 (schedule 라이브러리)**
+
+```python
+import schedule, time
+
+schedule.every().day.at('09:00').do(my_job)   # 매일 9시
+schedule.every().monday.do(my_job)            # 매주 월요일
+schedule.every(10).minutes.do(my_job)         # 10분마다
+
+while True:
+    schedule.run_pending()
+    time.sleep(60)
+```
+
+> 💡 **실무 추천**: Windows 작업 스케줄러(`schtasks`)를 사용하면 Python이 실행 중이지 않아도 하이!
+
+---
+
+### 📗 07. pandas 심화 — 데이터 분석 & Excel 입출력
+
+> 📄 [07.pandas_심화_데이터분석.ipynb](./07.pandas_심화_데이터분석.ipynb)
+
+**조건 필터링**
+
+```python
+# 단순
+df[df['선과점수'] >= 80]
+# 복합 (AND &, OR |)
+df[(df['부서'] == '영업팀') & (df['성과점수'] >= 80)]
+# query 방식 (실주 추천)
+df.query('성과점수 >= 80 and 교육시간 >= 15')
+```
+
+**groupby 집계**
+
+```python
+df.groupby('부서').agg(
+    인원수=('이름', 'count'),
+    평균교육시간=('교육시간', 'mean'),
+    평균성과=('성과점수', 'mean')
+).round(1).reset_index()
+```
+
+**피벗 테이블**
+
+```python
+pd.pivot_table(df, values='성과점수',
+               index='부서', columns='등급',
+               aggfunc='count', fill_value=0,
+               margins=True, margins_name='합계')
+```
+
+**pandas ↔ xlwings 연동**
+
+```python
+# xlwings → DataFrame
+df = ws.range('A1').expand('table').options(pd.DataFrame, header=1).value
+
+# DataFrame → xlwings
+ws.range('A1').options(pd.DataFrame, index=False).value = df
+```
+
+---
+
+### 📗 08. openpyxl — 서식 완전 제어
+
+> 📄 [08.openpyxl_서식완전제어.ipynb](./08.openpyxl_서식완전제어.ipynb)
+
+**xlwings vs openpyxl**
+
+| | xlwings | openpyxl |
+|:---|:---:|:---:|
+| Excel 실행 필요 | ✅ 기본 | ❌ 불필요 |
+| 실시간 제어 | ✅ | ❌ |
+| pandas 연동 | ✅ | ✅ (ExcelWriter) |
+| 조건부 서식 | ⚠️ 제한적 | ✅ 주체 |
+| 드롭다운/유효성 | ⚠️ | ✅ |
+| 이미지 삽입 | ⚠️ | ✅ |
+
+**서식 설정 패턴**
+
+```python
+from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+
+cell = ws['A1']
+cell.font   = Font(bold=True, color='FF0000', size=14)
+cell.fill   = PatternFill(fill_type='solid', fgColor='FFFF00')
+cell.border = Border(top=Side(style='thin'), bottom=Side(style='thin'))
+cell.alignment = Alignment(horizontal='center', vertical='center')
+cell.number_format = '#,##0"원"'
+```
+
+**조건부 서식**
+
+```python
+from openpyxl.formatting.rule import CellIsRule, ColorScaleRule
+
+# 값 비교
+ws.conditional_formatting.add('B2:B100',
+    CellIsRule(operator='greaterThanOrEqual', formula=['90'],
+               fill=green_fill, font=green_font))
+
+# 컴러 스케일 (자동 그라데이션)
+ws.conditional_formatting.add('C2:C100',
+    ColorScaleRule(start_type='min', start_color='FF0000',
+                   end_type='max',   end_color='00FF00'))
+```
+
+**드롭다운 (DataValidation)**
+
+```python
+from openpyxl.worksheet.datavalidation import DataValidation
+
+dv = DataValidation(type='list', formula1='"A,B,C"')
+ws.add_data_validation(dv)
+dv.add('C2:C100')
+```
+
+---
+
 ## ⚠️ 자주 만나는 에러와 해결
 
 | 증상 | 원인 | 해결 |
@@ -320,8 +467,14 @@ ws_result.range('A1').options(pd.DataFrame).value = df
 05. 데이터 취합 & 복사/붙여넣기
  │   └─ 복사 3가지 방법, pandas 연동
  ↓
-06. 실전 자동화 프로젝트 (예정)
-     └─ PDF 변환, 차트, 이메일, 스케줄링
+06. 실전 자동화 프로젝트
+     └─ 차트 생성, 스케줄링, PDF 변환
+ ↓
+07. pandas 심화
+     └─ groupby, 피벗, 필터링, xlwings 연동
+ ↓
+08. openpyxl — 서식 완전 제어
+     └─ 조건부 서식, 드롭다운, 이미지, 완성형 보고서
 ```
 
 ---
