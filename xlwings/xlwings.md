@@ -474,8 +474,101 @@ dv.add('C2:C100')
      └─ groupby, 피벗, 필터링, xlwings 연동
  ↓
 08. openpyxl — 서식 완전 제어
-     └─ 조건부 서식, 드롭다운, 이미지, 완성형 보고서
+      └─ 조건부 서식, 드롭다운, 이미지, 완성형 보고서
+ ↓
+09. 대용량 처리 & 실전 종합 심화
+      └─ 청크 처리, 멀티파일 통합, 대시보드, 이메일 발송, 파이프라인
 ```
+
+---
+
+### 📗 09. 대용량 처리 & 실전 종합 심화
+
+> 📄 [09.대용량처리_실전종합.ipynb](./09.대용량처리_실전종합.ipynb)
+
+**대용량 CSV/Excel 처리 3가지 방법**
+
+| 방법 | 코드 | 특징 |
+|:---|:---|:---|
+| 전체 읽기 | `pd.read_csv()` | 간단하지만 메모리 위험 |
+| dtype 최적화 | `dtype={'열': 'category'}` | 메모리 50~70% 절약 |
+| 청크 처리 | `chunksize=10_000` | 메모리 한계 초과할 때 |
+
+**청크 처리 패턴**
+
+```python
+results = []
+for chunk in pd.read_csv('big.csv', chunksize=10_000):
+    agg = chunk.groupby('부서')['매출액'].sum()
+    results.append(agg)
+
+final = pd.concat(results).groupby(level=0).sum()
+```
+
+**멀티파일 자동 통합**
+
+```python
+from pathlib import Path
+
+def merge_excel_files(folder: str, pattern: str = '*.xlsx') -> pd.DataFrame:
+    files = sorted(Path(folder).glob(pattern))
+    frames = []
+    for f in files:
+        try:
+            df = pd.read_excel(f)
+            df['출처'] = f.stem   # 파일명 메타정보
+            frames.append(df)
+        except Exception as e:
+            print(f'❌ {f.name}: {e}')  # 오류 파일 건너뛰기
+    return pd.concat(frames, ignore_index=True)
+```
+
+**로깅 설정**
+
+```python
+import logging
+
+logger = logging.getLogger('ExcelAuto')
+logger.setLevel(logging.DEBUG)
+
+# 파일 + 콘솔 동시 출력
+fh = logging.FileHandler('automation.log', encoding='utf-8')
+ch = logging.StreamHandler()
+logger.addHandler(fh)
+logger.addHandler(ch)
+
+logger.info('자동화 시작')
+logger.error('파일 없음: missing.xlsx')
+```
+
+**이메일 자동 발송 (Excel 첨부)**
+
+```python
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+msg = MIMEMultipart()
+msg['Subject'] = '월간 보고서'
+msg['From']    = 'sender@gmail.com'
+msg['To']      = 'recipient@example.com'
+
+# 파일 첨부
+with open('report.xlsx', 'rb') as f:
+    part = MIMEBase('application', 'octet-stream')
+    part.set_payload(f.read())
+encoders.encode_base64(part)
+part.add_header('Content-Disposition', 'attachment; filename="report.xlsx"')
+msg.attach(part)
+
+with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+    server.login('sender@gmail.com', 'app_password_16chars')
+    server.sendmail('sender@gmail.com', 'recipient@example.com', msg.as_string())
+```
+
+> 💡 **Gmail 앱 비밀번호**: Google 계정 → 보안 → 2단계 인증 → 앱 비밀번호
 
 ---
 
